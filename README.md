@@ -2,13 +2,13 @@
 
 Utilities for preparing ligand sets and simple pocket placement.
 
-Requirements
+## Requirements
 
 - Python 3.9+
 - Optional: RDKit for robust dedup + rotatable bond counts in `get_unique.py`
 - Optional: MUDock converter binary for `convert_to_adtmol2.sh`
 
-Quick start
+## Quick Start
 
 - Deduplicate a multi-mol2 file:
   `python get_unique.py input.mol2 -o unique_mol2_out`
@@ -17,7 +17,7 @@ Quick start
 - Place ligands into a pocket centered on a co-crystal ligand:
   `python place_in_pocket.py --protein protein.pdb --ligand_dir unique_mol2_out --crystal_mol2 crystal.mol2 --outdir placement_out`
 
-End-to-end flow from `molecules.mol2`
+## End-to-End Flow From `molecules.mol2`
 
 This example starts from one multi-molecule file (`molecules.mol2`) and ends with a final dataset in either `.mol2` or `.adtmol2`.
 
@@ -26,7 +26,7 @@ Inputs used in the example:
 - `data/protein.pdb`
 - `data/crystal.mol2`
 
-1. Split + deduplicate the source `molecules.mol2`:
+### 1. Split + deduplicate the source `molecules.mol2`
 
 ```bash
 python get_unique.py data/molecules.mol2 -o work/unique
@@ -36,67 +36,78 @@ Outputs:
 - `work/unique/*.mol2`
 - `work/unique/summary.csv`
 
-2. Sample a dataset (copy mode keeps sampled files physically separated):
-
-```bash
-python generate_the_dataset.py \
-  --ligand_dir work/unique \
-  --summary_csv work/unique/summary.csv \
-  --n 1000 \
-  --mode copy \
-  --outdir work/dataset_sample
-```
-
-Outputs:
-- `work/dataset_sample/dataset.csv`
-- `work/dataset_sample/files/*.mol2`
-
-3. Place sampled ligands into the protein pocket:
+### 2. Place ligands into the protein pocket
 
 ```bash
 python place_in_pocket.py \
   --protein data/protein.pdb \
-  --ligand_dir work/dataset_sample/files \
+  --ligand_dir work/unique \
   --outdir work/final_mol2 \
   --radius 10 \
   --crystal_mol2 data/crystal.mol2
 ```
 
-Final MOL2 dataset:
+Outputs:
 - `work/final_mol2/placed_ligands/*.mol2`
 - `work/final_mol2/placement_summary.csv`
 - `work/final_mol2/pocket.pdb`
 
-4. Optional: convert final MOL2 dataset to ADTMOL2:
+### 3. Build a sampling summary aligned with placed filenames
 
 ```bash
-./convert_to_adtmol2.sh work/final_mol2/placed_ligands /path/to/mudock/build
+awk -F, 'BEGIN{OFS=","} NR==1{print "ligand,num_atoms,rotatable_bonds"; next} NR>1{print $1 "_placed",$2,0}' \
+  work/final_mol2/placement_summary.csv > work/final_mol2/placed_summary.csv
+```
+
+Output:
+- `work/final_mol2/placed_summary.csv`
+
+### 4. Generate the final sampled MOL2 dataset
+
+```bash
+python generate_the_dataset.py \
+  --ligand_dir work/final_mol2/placed_ligands \
+  --summary_csv work/final_mol2/placed_summary.csv \
+  --n 1000 \
+  --mode copy \
+  --outdir work/dataset_sample
+```
+
+Final sampled MOL2 dataset:
+- `work/dataset_sample/dataset.csv`
+- `work/dataset_sample/files/*.mol2`
+
+### 5. Optional: convert final MOL2 dataset to ADTMOL2
+
+```bash
+./convert_to_adtmol2.sh work/dataset_sample/files /path/to/mudock/build
 ```
 
 Final ADTMOL2 dataset:
-- `work/final_mol2/placed_ligands/adtmol2/*.adtmol2`
+- `work/dataset_sample/files/adtmol2/*.adtmol2`
 
-Minimal directory view after full flow:
+### Minimal directory view after full flow
 
 ```text
 work/
   unique/
     summary.csv
     *.mol2
-  dataset_sample/
-    dataset.csv
-    files/
-      *.mol2
   final_mol2/
     pocket.pdb
     placement_summary.csv
+    placed_summary.csv
     placed_ligands/
+      *.mol2
+  dataset_sample/
+    dataset.csv
+    files/
       *.mol2
       adtmol2/
         *.adtmol2
 ```
 
-Scripts
+## Scripts
 
 - `get_unique.py`: deduplicate ligands in a multi-mol2 file, write per-ligand mol2 files and `summary.csv`.
 - `generate_the_dataset.py`: sample ligands with size bias and write `dataset.csv`; can also copy files or aggregate to a single mol2.
@@ -107,7 +118,51 @@ Scripts
 - `convert_to_adtmol2.sh`: convert `.mol2` to `.adtmol2` using MUDock converter.
   - `./convert_to_adtmol2.sh /path/to/ligands /path/to/mudock/build`
 
-Structure
+## `generate_the_dataset.py` explained
+
+Current scoring logic is intentionally simple: for the time being, sampling weights are computed only from:
+- `num_atoms`
+- `rotatable_bonds` (rotamers)
+
+The script reads these values from `--summary_csv`, computes a size score, then gives higher probability to smaller ligands.
+
+Size score used internally:
+- `size_score = (num_atoms / atom_scale) + (rotatable_bonds / rotor_scale)`
+- `weight = 1 / (size_score ^ bias)` (if `bias=0`, sampling is uniform)
+
+Main input parameters:
+- `--ligand_dir`: folder containing input ligand files (`.mol2` or `.adtmol2`)
+- `--ext`: ligand extension to read (`mol2` or `adtmol2`)
+- `--summary_csv`: CSV with ligand identity + `num_atoms` (+ optional `rotatable_bonds`)
+- `--n`: number of samples to draw (with replacement)
+- `--outdir`: output directory for `dataset.csv` and optional files
+- `--mode`: output mode
+  - `manifest`: write only `dataset.csv`
+  - `copy`: write `dataset.csv` and copy sampled ligand files
+  - `aggregate`: write `dataset.csv` and one combined MOL2/ADTMOL2 file
+- `--seed`: random seed for reproducibility
+- `--bias`: strength of preference for small ligands (`0` disables size bias)
+- `--atom_scale`: how strongly atom count contributes to size score
+- `--rotor_scale`: how strongly rotamer count contributes to size score
+- `--missing_atoms`: fallback value when `num_atoms` is missing in CSV
+- `--missing_rotors`: fallback value when `rotatable_bonds` is missing in CSV
+
+Minimal example:
+
+```bash
+python generate_the_dataset.py \
+  --ligand_dir work/final_mol2/placed_ligands \
+  --summary_csv work/final_mol2/placed_summary.csv \
+  --ext mol2 \
+  --n 1000 \
+  --mode copy \
+  --bias 1.5 \
+  --atom_scale 30 \
+  --rotor_scale 5 \
+  --outdir work/dataset_sample
+```
+
+## Structure
 
 - `data/`: input data (if used)
 - `get_unique.py`, `generate_the_dataset.py`, `place_in_pocket.py`: core scripts
