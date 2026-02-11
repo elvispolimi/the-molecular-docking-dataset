@@ -228,7 +228,9 @@ def main():
         "EXTREME": [16, 32, 58, 64, 96, 128, 160, 192, 256],
     }[args.bucket_mode]
     bucket_counts = [0 for _ in bucket_thresholds]
+    bucket_atom_sums = [0 for _ in bucket_thresholds]
     bucket_overflow = 0
+    bucket_overflow_atoms = 0
 
     # Prepare outputs
     manifest_path = os.path.join(args.outdir, "dataset.csv")
@@ -274,8 +276,10 @@ def main():
                         bucket_index += 1
                 if bucket_index >= len(bucket_thresholds):
                     bucket_overflow += 1
+                    bucket_overflow_atoms += atoms
                 else:
                     bucket_counts[bucket_index] += 1
+                    bucket_atom_sums[bucket_index] += atoms
 
             copied = ""
             if args.mode == "copy":
@@ -328,9 +332,13 @@ def main():
     if args.report_buckets:
         print(f"Bucket mode: {args.bucket_mode}")
         for i, t in enumerate(bucket_thresholds):
-            print(f"  bucket <= {t:>3}: {bucket_counts[i]}")
+            print(
+                f"  bucket <= {t:>3}: ligands={bucket_counts[i]} atoms={bucket_atom_sums[i]}"
+            )
         if bucket_overflow:
-            print(f"  overflow (> {bucket_thresholds[-1]}): {bucket_overflow}")
+            print(
+                f"  overflow (> {bucket_thresholds[-1]}): ligands={bucket_overflow} atoms={bucket_overflow_atoms}"
+            )
 
 
 if __name__ == "__main__":
