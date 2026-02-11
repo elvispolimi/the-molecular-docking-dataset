@@ -40,6 +40,7 @@ def load_summary_csv(
             return None
 
         ligand_col = pick_col(["ligand", "name", "mol2_file", "out_mol2", "mol2"])
+        out_mol2_col = pick_col(["out_mol2"])
         atoms_col = pick_col(["num_atoms", "atoms", "natoms"])
         rot_col = pick_col(
             ["rotatable_bonds", "rotamers", "rotors", "n_rotatable_bonds"]
@@ -53,12 +54,19 @@ def load_summary_csv(
         out: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
         for row in reader:
             lig = (row.get(ligand_col) or "").strip()
-            if not lig:
+            out_mol2 = (row.get(out_mol2_col) or "").strip() if out_mol2_col else ""
+            if not lig and not out_mol2:
                 continue
-            lig_base = os.path.splitext(os.path.basename(lig))[0]
+            lig_base = os.path.splitext(os.path.basename(lig))[0] if lig else ""
+            out_base = os.path.splitext(os.path.basename(out_mol2))[0] if out_mol2 else ""
             atoms = safe_float(row.get(atoms_col))
             rot = safe_float(row.get(rot_col)) if rot_col else None
-            out[lig_base] = (atoms, rot)
+            # Map multiple possible keys to support placed/adapted filenames
+            if lig_base:
+                out[lig_base] = (atoms, rot)
+                out[f"{lig_base}_placed"] = (atoms, rot)
+            if out_base:
+                out[out_base] = (atoms, rot)
         return out
 
 
