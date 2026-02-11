@@ -11,7 +11,8 @@ from typing import List, Tuple, Optional
 
 def split_mol2_blocks(text: str):
     blocks = re.split(r"(?=@<TRIPOS>MOLECULE\b)", text)
-    return [b for b in blocks if b.strip()]
+    # Ignore file preamble/comments before the first MOLECULE marker.
+    return [b for b in blocks if b.lstrip().startswith("@<TRIPOS>MOLECULE")]
 
 
 def mol2_atom_coords(block: str) -> List[Tuple[float, float, float, int]]:

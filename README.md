@@ -25,11 +25,11 @@ Scripts
   - Copy files: `--mode copy`
   - Aggregate: `--mode aggregate --out_aggregate dataset.mol2`
 - `place_in_pocket.py`: extract a protein pocket and translate ligands to the pocket center (no docking).
-- `convert_admol2.sh`: convert `.mol2` to `.adtmol2` using MUDock converter.
-  - `./convert_admol2.sh /path/to/ligands /path/to/mudock/build`
+- `convert_to_adtmol2.sh`: convert `.mol2` to `.adtmol2` using MUDock converter.
+  - `./convert_to_adtmol2.sh /path/to/ligands /path/to/mudock/build`
 
 Structure
 
 - `data/`: input data (if used)
 - `get_unique.py`, `generate_the_dataset.py`, `place_in_pocket.py`: core scripts
-- `convert_admol2.sh`: mol2 to adtmol2 conversion helper
+- `convert_to_adtmol2.sh`: mol2 to adtmol2 conversion helper

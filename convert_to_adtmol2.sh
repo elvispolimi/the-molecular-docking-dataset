@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage:
-#   ./convert_admol2.sh /path/to/ligands /path/to/mudock/build
+#   ./convert_to_adtmol2.sh /path/to/ligands /path/to/mudock/build
 #
 # Outputs go to:
 #   /path/to/ligands/adtmol2/<name>.adtmol2
