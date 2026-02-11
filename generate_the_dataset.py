@@ -174,6 +174,19 @@ def main():
         "--missing_rotors", type=float, default=5.0, help="Fallback rotors if missing"
     )
 
+    # bucket reporting
+    ap.add_argument(
+        "--report_buckets",
+        action="store_true",
+        help="Report bucket distribution for sampled ligands",
+    )
+    ap.add_argument(
+        "--bucket_mode",
+        choices=["DEFAULT", "MEDIUM", "LARGE", "EXTREME"],
+        default="LARGE",
+        help="Bucket thresholds for reporting (matches muDock reorder_buffer.hpp)",
+    )
+
     # output mode
     ap.add_argument(
         "--mode",
@@ -206,6 +219,16 @@ def main():
     )
 
     rng = random.Random(args.seed)
+
+    # bucket thresholds for reporting
+    bucket_thresholds = {
+        "DEFAULT": [256],
+        "MEDIUM": [32, 64, 128, 256],
+        "LARGE": [32, 64, 128, 160, 192, 256],
+        "EXTREME": [16, 32, 58, 64, 96, 128, 160, 192, 256],
+    }[args.bucket_mode]
+    bucket_counts = [0 for _ in bucket_thresholds]
+    bucket_overflow = 0
 
     # Prepare outputs
     manifest_path = os.path.join(args.outdir, "dataset.csv")
@@ -241,6 +264,18 @@ def main():
             idx = weighted_choice_index(rng, weights)
             m = meta[idx]
             src = m["path"]
+
+            if args.report_buckets:
+                atoms = int(m["num_atoms"])
+                # count thresholds <= atoms (same logic as reorder_buffer)
+                bucket_index = 0
+                for t in bucket_thresholds:
+                    if t <= atoms:
+                        bucket_index += 1
+                if bucket_index >= len(bucket_thresholds):
+                    bucket_overflow += 1
+                else:
+                    bucket_counts[bucket_index] += 1
 
             copied = ""
             if args.mode == "copy":
@@ -290,6 +325,12 @@ def main():
         print(f"Copied files into: {copied_dir}/")
     if args.mode == "aggregate":
         print(f"Aggregate file: {agg_path}")
+    if args.report_buckets:
+        print(f"Bucket mode: {args.bucket_mode}")
+        for i, t in enumerate(bucket_thresholds):
+            print(f"  bucket <= {t:>3}: {bucket_counts[i]}")
+        if bucket_overflow:
+            print(f"  overflow (> {bucket_thresholds[-1]}): {bucket_overflow}")
 
 
 if __name__ == "__main__":
