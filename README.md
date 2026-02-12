@@ -14,6 +14,8 @@ Utilities for preparing ligand sets and simple pocket placement.
   `python get_unique.py input.mol2 -o unique_mol2_out`
 - Generate a sampled dataset (manifest only):
   `python generate_the_dataset.py --ligand_dir unique_mol2_out --summary_csv unique_mol2_out/summary.csv --n 1000 --outdir dataset_out`
+- Generate multiple dataset sizes in one shot (aggregate only, no per-ligand copies):
+  `./generate_sweep.sh out_sweep data/original_ligands data/original_ligands/summary.csv 50000 200000 1000000`
 - Place ligands into a pocket centered on a co-crystal ligand:
   `python place_in_pocket.py --protein protein.pdb --ligand_dir unique_mol2_out --crystal_mol2 crystal.mol2 --outdir placement_out`
 
@@ -114,6 +116,10 @@ work/
   - Manifest only: `--mode manifest` (default)
   - Copy files: `--mode copy`
   - Aggregate: `--mode aggregate --out_aggregate dataset.mol2`
+  - Skip manifest: `--no_manifest`
+  - Report bucket distribution: `--report_buckets --bucket_mode LARGE`
+  - Custom bucket thresholds: `--bucket_thresholds "32,64,96,128,160,192"`
+- `generate_sweep.sh`: generate multiple dataset sizes (aggregate only) using `generate_the_dataset.py`.
 - `place_in_pocket.py`: extract a protein pocket and translate ligands to the pocket center (no docking).
 - `convert_to_adtmol2.sh`: convert `.mol2` to `.adtmol2` using MUDock converter.
   - `./convert_to_adtmol2.sh /path/to/ligands /path/to/mudock/build`
@@ -146,6 +152,11 @@ Main input parameters:
 - `--rotor_scale`: how strongly rotamer count contributes to size score
 - `--missing_atoms`: fallback value when `num_atoms` is missing in CSV
 - `--missing_rotors`: fallback value when `rotatable_bonds` is missing in CSV
+- `--no_manifest`: do not write `dataset.csv`
+- `--report_buckets`: print bucket distribution summary
+- `--bucket_mode`: use predefined bucket thresholds (`DEFAULT`, `MEDIUM`, `LARGE`, `EXTREME`)
+- `--bucket_thresholds`: override thresholds with a comma-separated list
+- `--ext adtmol2`: the script will match CSV rows against multiple keys; for placed ligands it supports `ligand`, `ligand_placed`, and `out_mol2` basenames so `.adtmol2` inputs map correctly
 
 Minimal example:
 
@@ -160,6 +171,12 @@ python generate_the_dataset.py \
   --atom_scale 30 \
   --rotor_scale 5 \
   --outdir work/dataset_sample
+```
+
+Generate multiple sizes into one output folder (aggregate only, no manifest):
+
+```bash
+./generate_sweep.sh out_sweep work/final_mol2/placed_ligands work/final_mol2/placement_summary.csv 50000 200000 1000000
 ```
 
 ## Structure

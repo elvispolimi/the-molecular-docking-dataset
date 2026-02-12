@@ -2,21 +2,20 @@
 set -euo pipefail
 
 # Usage:
-#   ./generate_sweep.sh OUT_BASE_DIR N1 N2 N3 ...
+#   ./generate_sweep.sh OUT_BASE_DIR LIGAND_DIR SUMMARY_CSV N1 N2 N3 ...
 #
 # Example:
-#   ./generate_sweep.sh out_sweep 50000 200000 1000000
+#   ./generate_sweep.sh out_sweep data/original_ligands data/original_ligands/summary.csv 50000 200000 1000000
 
-if [[ $# -lt 2 ]]; then
-  echo "Usage: $0 OUT_BASE_DIR N1 N2 N3 ..."
+if [[ $# -lt 4 ]]; then
+  echo "Usage: $0 OUT_BASE_DIR LIGAND_DIR SUMMARY_CSV N1 N2 N3 ..."
   exit 1
 fi
 
 OUT_BASE_DIR="$1"
-shift
-
-LIGAND_DIR="data/original_ligands"
-SUMMARY_CSV="data/original_ligands/summary.csv"
+LIGAND_DIR="$2"
+SUMMARY_CSV="$3"
+shift 3
 
 # Mild bias toward smaller ligands (tweak if needed)
 BIAS="0.8"
@@ -36,6 +35,7 @@ for N in "$@"; do
     --atom_scale "${ATOM_SCALE}" \
     --rotor_scale "${ROTOR_SCALE}" \
     --mode aggregate \
+    --no_manifest \
     --outdir "${OUTDIR}" \
     --out_aggregate dataset.mol2 \
     --report_buckets \

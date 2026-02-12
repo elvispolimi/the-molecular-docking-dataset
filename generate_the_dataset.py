@@ -194,6 +194,11 @@ def main():
         default="LARGE",
         help="Bucket thresholds for reporting (matches muDock reorder_buffer.hpp)",
     )
+    ap.add_argument(
+        "--bucket_thresholds",
+        default="",
+        help='Custom bucket thresholds (comma-separated), e.g. "32,64,96,128,160,192"',
+    )
 
     # output mode
     ap.add_argument(
@@ -201,6 +206,11 @@ def main():
         choices=["manifest", "copy", "aggregate"],
         default="manifest",
         help="manifest: only dataset.csv; copy: copy sampled files; aggregate: write one combined file",
+    )
+    ap.add_argument(
+        "--no_manifest",
+        action="store_true",
+        help="Skip writing dataset.csv (useful when only aggregate output is needed)",
     )
     ap.add_argument(
         "--out_aggregate",
@@ -229,12 +239,18 @@ def main():
     rng = random.Random(args.seed)
 
     # bucket thresholds for reporting
-    bucket_thresholds = {
-        "DEFAULT": [256],
-        "MEDIUM": [32, 64, 128, 256],
-        "LARGE": [32, 64, 128, 160, 192, 256],
-        "EXTREME": [16, 32, 58, 64, 96, 128, 160, 192, 256],
-    }[args.bucket_mode]
+    if args.bucket_thresholds.strip():
+        bucket_thresholds = [
+            int(x) for x in args.bucket_thresholds.split(",") if x.strip()
+        ]
+        bucket_thresholds = sorted(bucket_thresholds)
+    else:
+        bucket_thresholds = {
+            "DEFAULT": [256],
+            "MEDIUM": [32, 64, 128, 256],
+            "LARGE": [32, 64, 128, 160, 192, 256],
+            "EXTREME": [16, 32, 58, 64, 96, 128, 160, 192, 256],
+        }[args.bucket_mode]
     bucket_counts = [0 for _ in bucket_thresholds]
     bucket_atom_sums = [0 for _ in bucket_thresholds]
     bucket_overflow = 0
@@ -255,21 +271,7 @@ def main():
     if args.mode == "copy":
         os.makedirs(copied_dir, exist_ok=True)
 
-    with open(manifest_path, "w", newline="", encoding="utf-8") as f:
-        fieldnames = [
-            "sample_id",
-            "selected_base",
-            "source_path",
-            "num_atoms",
-            "rotatable_bonds",
-            "size_score",
-            "weight",
-            "copied_path",
-            "aggregate_file",
-        ]
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-
+    if args.no_manifest:
         for k in range(args.n):
             idx = weighted_choice_index(rng, weights)
             m = meta[idx]
@@ -289,12 +291,10 @@ def main():
                     bucket_counts[bucket_index] += 1
                     bucket_atom_sums[bucket_index] += atoms
 
-            copied = ""
             if args.mode == "copy":
                 ext = os.path.splitext(src)[1]
                 dst = os.path.join(copied_dir, f"{k:06d}_{m['base']}{ext}")
                 shutil.copy2(src, dst)
-                copied = os.path.relpath(dst, args.outdir)
 
             if args.mode == "aggregate":
                 # Append all MOL2 blocks from the chosen file
@@ -309,22 +309,77 @@ def main():
                         agg_handle.write("".join(lines))
                     else:
                         agg_handle.write(b.rstrip() + "\n")
+    else:
+        with open(manifest_path, "w", newline="", encoding="utf-8") as f:
+            fieldnames = [
+                "sample_id",
+                "selected_base",
+                "source_path",
+                "num_atoms",
+                "rotatable_bonds",
+                "size_score",
+                "weight",
+                "copied_path",
+                "aggregate_file",
+            ]
+            w = csv.DictWriter(f, fieldnames=fieldnames)
+            w.writeheader()
 
-            w.writerow(
-                {
-                    "sample_id": k,
-                    "selected_base": m["base"],
-                    "source_path": os.path.abspath(src),
-                    "num_atoms": m["num_atoms"],
-                    "rotatable_bonds": m["rotatable_bonds"],
-                    "size_score": f"{m['size_score']:.6f}",
-                    "weight": f"{m['weight']:.6e}",
-                    "copied_path": copied,
-                    "aggregate_file": (
-                        args.out_aggregate if args.mode == "aggregate" else ""
-                    ),
-                }
-            )
+            for k in range(args.n):
+                idx = weighted_choice_index(rng, weights)
+                m = meta[idx]
+                src = m["path"]
+
+                if args.report_buckets:
+                    atoms = int(m["num_atoms"])
+                    # count thresholds <= atoms (same logic as reorder_buffer)
+                    bucket_index = 0
+                    for t in bucket_thresholds:
+                        if t <= atoms:
+                            bucket_index += 1
+                    if bucket_index >= len(bucket_thresholds):
+                        bucket_overflow += 1
+                        bucket_overflow_atoms += atoms
+                    else:
+                        bucket_counts[bucket_index] += 1
+                        bucket_atom_sums[bucket_index] += atoms
+
+                copied = ""
+                if args.mode == "copy":
+                    ext = os.path.splitext(src)[1]
+                    dst = os.path.join(copied_dir, f"{k:06d}_{m['base']}{ext}")
+                    shutil.copy2(src, dst)
+                    copied = os.path.relpath(dst, args.outdir)
+
+                if args.mode == "aggregate":
+                    # Append all MOL2 blocks from the chosen file
+                    blocks = read_all_blocks(src)
+                    # Optional: make molecule names unique by prefixing sample_id
+                    # (simple text tweak on 2nd line after @<TRIPOS>MOLECULE if present)
+                    for b in blocks:
+                        lines = b.splitlines(True)
+                        if len(lines) >= 2 and lines[0].startswith("@<TRIPOS>MOLECULE"):
+                            # rename molecule line
+                            lines[1] = f"{k:06d}_{m['base']}\n"
+                            agg_handle.write("".join(lines))
+                        else:
+                            agg_handle.write(b.rstrip() + "\n")
+
+                w.writerow(
+                    {
+                        "sample_id": k,
+                        "selected_base": m["base"],
+                        "source_path": os.path.abspath(src),
+                        "num_atoms": m["num_atoms"],
+                        "rotatable_bonds": m["rotatable_bonds"],
+                        "size_score": f"{m['size_score']:.6f}",
+                        "weight": f"{m['weight']:.6e}",
+                        "copied_path": copied,
+                        "aggregate_file": (
+                            args.out_aggregate if args.mode == "aggregate" else ""
+                        ),
+                    }
+                )
 
     if agg_handle:
         agg_handle.close()
@@ -332,7 +387,8 @@ def main():
     print("DONE")
     print(f"Input ligands: {len(files)} (*.{args.ext})")
     print(f"Samples generated: {args.n} (with replacement)")
-    print(f"Manifest: {manifest_path}")
+    if not args.no_manifest:
+        print(f"Manifest: {manifest_path}")
     if args.mode == "copy":
         print(f"Copied files into: {copied_dir}/")
     if args.mode == "aggregate":
