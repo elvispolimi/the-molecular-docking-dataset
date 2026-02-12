@@ -16,6 +16,8 @@ Utilities for preparing ligand sets and simple pocket placement.
   `python generate_the_dataset.py --ligand_dir unique_mol2_out --summary_csv unique_mol2_out/summary.csv --n 1000 --outdir dataset_out`
 - Generate multiple dataset sizes in one shot (aggregate only, no per-ligand copies):
   `./generate_sweep.sh out_sweep data/original_ligands data/original_ligands/summary.csv 50000 200000 1000000`
+- Filter a summary CSV by atom/rotor ranges:
+  `./filter_summary.sh data/original_ligands/summary.csv tmp_32_64.csv --min-atoms 32 --max-atoms 64`
 - Place ligands into a pocket centered on a co-crystal ligand:
   `python place_in_pocket.py --protein protein.pdb --ligand_dir unique_mol2_out --crystal_mol2 crystal.mol2 --outdir placement_out`
 
@@ -120,6 +122,7 @@ work/
   - Report bucket distribution: `--report_buckets --bucket_mode LARGE`
   - Custom bucket thresholds: `--bucket_thresholds "32,64,96,128,160,192"`
 - `generate_sweep.sh`: generate multiple dataset sizes (aggregate only) using `generate_the_dataset.py`.
+- `filter_summary.sh`: filter a summary CSV by atom/rotor ranges (for range-specific sampling).
 - `place_in_pocket.py`: extract a protein pocket and translate ligands to the pocket center (no docking).
 - `convert_to_adtmol2.sh`: convert `.mol2` to `.adtmol2` using MUDock converter.
   - `./convert_to_adtmol2.sh /path/to/ligands /path/to/mudock/build`
