@@ -31,6 +31,7 @@ for N in "$@"; do
   mkdir -p "${OUTDIR}"
   SUMMARY_FILE="${OUTDIR}/summary.txt"
   REPO_COMMIT="$(git -C . rev-parse HEAD 2>/dev/null || echo unknown)"
+  OUT_AGG="dataset.${EXT}"
 
   CMD=(python3 generate_the_dataset.py
     --ligand_dir "${LIGAND_DIR}"
@@ -43,7 +44,7 @@ for N in "$@"; do
     --mode aggregate
     --no_manifest
     --outdir "${OUTDIR}"
-    --out_aggregate dataset.mol2
+    --out_aggregate "${OUT_AGG}"
     --report_buckets
     --bucket_mode LARGE)
 
