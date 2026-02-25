@@ -155,6 +155,7 @@ Main input parameters:
 - `--rotor_scale`: how strongly rotamer count contributes to size score
 - `--missing_atoms`: fallback value when `num_atoms` is missing in CSV
 - `--missing_rotors`: fallback value when `rotatable_bonds` is missing in CSV
+- `--allow_unmatched`: include ligands found in `--ligand_dir` but missing from `--summary_csv` (legacy behavior); by default, unmatched ligands are ignored
 - `--no_manifest`: do not write `dataset.csv`
 - `--report_buckets`: print bucket distribution summary
 - `--bucket_mode`: use predefined bucket thresholds (`DEFAULT`, `MEDIUM`, `LARGE`, `EXTREME`)

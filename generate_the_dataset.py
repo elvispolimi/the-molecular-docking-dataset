@@ -181,6 +181,11 @@ def main():
     ap.add_argument(
         "--missing_rotors", type=float, default=5.0, help="Fallback rotors if missing"
     )
+    ap.add_argument(
+        "--allow_unmatched",
+        action="store_true",
+        help="Include ligands not present in summary CSV (uses --missing_atoms/--missing_rotors for those). By default, only ligands present in summary are sampled.",
+    )
 
     # bucket reporting
     ap.add_argument(
@@ -225,6 +230,21 @@ def main():
     files = list_input_files(args.ligand_dir, args.ext)
     if not files:
         raise SystemExit(f"No *.{args.ext} files found in {args.ligand_dir}")
+
+    dropped_unmatched = 0
+    if not args.allow_unmatched:
+        matched_files = []
+        for fp in files:
+            base = os.path.splitext(os.path.basename(fp))[0]
+            if base in stats:
+                matched_files.append(fp)
+        dropped_unmatched = len(files) - len(matched_files)
+        if not matched_files:
+            raise SystemExit(
+                "No ligands in --ligand_dir matched entries in --summary_csv. "
+                "Use a matching summary or pass --allow_unmatched to restore legacy behavior."
+            )
+        files = matched_files
 
     weights, meta = build_weights(
         files,
@@ -386,6 +406,8 @@ def main():
 
     print("DONE")
     print(f"Input ligands: {len(files)} (*.{args.ext})")
+    if dropped_unmatched:
+        print(f"Ignored unmatched ligands: {dropped_unmatched}")
     print(f"Samples generated: {args.n} (with replacement)")
     if not args.no_manifest:
         print(f"Manifest: {manifest_path}")

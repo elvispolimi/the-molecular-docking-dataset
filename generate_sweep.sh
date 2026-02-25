@@ -19,10 +19,25 @@ SUMMARY_CSV="$3"
 EXT="$4"
 shift 4
 
+if [[ ! -d "${LIGAND_DIR}" ]]; then
+  echo "Error: ligand directory not found: ${LIGAND_DIR}"
+  exit 1
+fi
+if [[ ! -f "${SUMMARY_CSV}" ]]; then
+  echo "Error: summary CSV not found: ${SUMMARY_CSV}"
+  exit 1
+fi
+for N in "$@"; do
+  if [[ ! "${N}" =~ ^[0-9]+$ ]] || [[ "${N}" -le 0 ]]; then
+    echo "Error: invalid dataset size '${N}' (must be a positive integer)"
+    exit 1
+  fi
+done
+
 # Mild bias toward smaller ligands (tweak if needed)
-BIAS="0.8"
-ATOM_SCALE="50"
-ROTOR_SCALE="8"
+BIAS="2"
+ATOM_SCALE="30"
+ROTOR_SCALE="10e9"
 
 mkdir -p "${OUT_BASE_DIR}"
 
@@ -50,6 +65,7 @@ for N in "$@"; do
 
   {
     echo "Repo commit: ${REPO_COMMIT}"
+    echo "Sampling policy: strict summary matching (only ligands present in --summary_csv are sampled)"
     printf "Command:"
     printf " %q" "${CMD[@]}"
     echo
