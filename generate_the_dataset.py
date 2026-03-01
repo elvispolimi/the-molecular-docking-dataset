@@ -40,6 +40,9 @@ def load_summary_csv(
             return None
 
         ligand_col = pick_col(["ligand", "name", "mol2_file", "out_mol2", "mol2"])
+        name_col = pick_col(["name"])
+        mol2_file_col = pick_col(["mol2_file"])
+        mol2_col = pick_col(["mol2"])
         out_mol2_col = pick_col(["out_mol2"])
         atoms_col = pick_col(["num_atoms", "atoms", "natoms"])
         rot_col = pick_col(
@@ -54,19 +57,28 @@ def load_summary_csv(
         out: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
         for row in reader:
             lig = (row.get(ligand_col) or "").strip()
+            name = (row.get(name_col) or "").strip() if name_col else ""
+            mol2_file = (row.get(mol2_file_col) or "").strip() if mol2_file_col else ""
+            mol2 = (row.get(mol2_col) or "").strip() if mol2_col else ""
             out_mol2 = (row.get(out_mol2_col) or "").strip() if out_mol2_col else ""
-            if not lig and not out_mol2:
+            if not lig and not name and not mol2_file and not mol2 and not out_mol2:
                 continue
             lig_base = os.path.splitext(os.path.basename(lig))[0] if lig else ""
+            name_base = os.path.splitext(os.path.basename(name))[0] if name else ""
+            mol2_file_base = (
+                os.path.splitext(os.path.basename(mol2_file))[0] if mol2_file else ""
+            )
+            mol2_base = os.path.splitext(os.path.basename(mol2))[0] if mol2 else ""
             out_base = os.path.splitext(os.path.basename(out_mol2))[0] if out_mol2 else ""
             atoms = safe_float(row.get(atoms_col))
             rot = safe_float(row.get(rot_col)) if rot_col else None
             # Map multiple possible keys to support placed/adapted filenames
-            if lig_base:
-                out[lig_base] = (atoms, rot)
-                out[f"{lig_base}_placed"] = (atoms, rot)
-            if out_base:
-                out[out_base] = (atoms, rot)
+            keys = [lig_base, name_base, mol2_file_base, mol2_base, out_base]
+            for base in keys:
+                if not base:
+                    continue
+                out[base] = (atoms, rot)
+                out[f"{base}_placed"] = (atoms, rot)
         return out
 
 
